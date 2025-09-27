@@ -1,0 +1,14 @@
+# 기본 라이브러리
+gradio
+pydub
+pyannote.audio
+openai
+langchain
+langchain-google-genai
+python-dotenv
+torch
+
+# 참고:
+# 1. torch: GPU 사용 시, CUDA 버전에 맞는 버전을 설치하는 것을 권장합니다. (https://pytorch.org/get-started/locally/)
+# 2. pyannote.audio: 사용을 위해 Hugging Face에서 라이선스 동의가 필요할 수 있습니다.
+# 3. ffmpeg: pydub을 이용한 mp4, m4a 등의 파일 변환을 위해 시스템에 설치 및 PATH 설정이 필요합니다.
