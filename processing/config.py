@@ -10,7 +10,7 @@ TEMP_DIR_NAME = "temp"
 STT_MODEL = "whisper-1"
 
 # 사용 가능한 LLM 모델
-AVAILABLE_LLMS = ["gpt-4", "gemini-pro"]
+AVAILABLE_LLMS = ["gpt-4o", "gemini-2.5-pro"]
 
 # 기본 회의 주제 및 키워드 (UI에서 오버라이드 가능)
 DEFAULT_MEETING_TOPIC = "회의"
