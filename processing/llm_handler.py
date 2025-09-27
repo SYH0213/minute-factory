@@ -32,13 +32,13 @@ def get_gemini_chain(template_string, input_vars):
         return None
     
     prompt = PromptTemplate(template=template_string, input_variables=input_vars)
-    llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.5)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.5)
     return LLMChain(llm=llm, prompt=prompt)
 
 # --- 텍스트 교정 (Correction) --- #
 
 def _correct_with_gpt(client, text, topic, keywords):
-    """GPT-4를 사용하여 텍스트를 교정합니다."""
+    """GPT-4o를 사용하여 텍스트를 교정합니다."""
     prompt = f"""다음 텍스트는 '{topic}'에 대한 회의 내용입니다. 
     주요 키워드는 {', '.join(keywords)} 입니다. 
     문맥에 맞게 문장을 다듬고, 맞춤법 및 띄어쓰기를 수정해주세요. 
@@ -51,7 +51,7 @@ def _correct_with_gpt(client, text, topic, keywords):
     """
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that corrects and refines meeting transcripts."},
                 {"role": "user", "content": prompt}
@@ -60,11 +60,11 @@ def _correct_with_gpt(client, text, topic, keywords):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        logging.error(f"GPT-4 교정 중 오류 발생: {e}")
+        logging.error(f"GPT-4o 교정 중 오류 발생: {e}")
         return text
 
 def _correct_with_gemini(text, topic, keywords):
-    """Gemini Pro를 사용하여 텍스트를 교정합니다."""
+    """Gemini 2.5 Pro를 사용하여 텍스트를 교정합니다."""
     template = '''
     당신은 회의록을 교정하고 다듬는 전문적인 AI 어시스턴트입니다.
     회의 주제: "{topic}"
@@ -90,11 +90,11 @@ def _correct_with_gemini(text, topic, keywords):
 def correct_text(llm_choice, text, topic, keywords):
     """선택된 LLM을 사용하여 텍스트를 교정합니다."""
     logging.info(f"LLM({llm_choice})으로 텍스트 교정을 시작합니다...")
-    if llm_choice == "gpt-4":
+    if llm_choice == "gpt-4o":
         client = get_openai_client()
         if not client: return text
         return _correct_with_gpt(client, text, topic, keywords)
-    elif llm_choice == "gemini-pro":
+    elif llm_choice == "gemini-2.5-pro":
         return _correct_with_gemini(text, topic, keywords)
     else:
         logging.warning(f"지원하지 않는 LLM 모델({llm_choice})입니다. 원본 텍스트를 반환합니다.")
@@ -103,7 +103,7 @@ def correct_text(llm_choice, text, topic, keywords):
 # --- 텍스트 요약 (Summarization) --- #
 
 def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
-    """GPT-4-turbo와 MapReduce 방식으로 긴 텍스트를 요약합니다."""
+    """GPT-4o와 MapReduce 방식으로 긴 텍스트를 요약합니다."""
     
     def get_summary_for_chunk(chunk):
         prompt = f"""다음은 '{topic}'에 관한 회의 대화의 일부입니다. 이 대화 내용을 바탕으로 핵심 내용을 간결하게 요약해 주십시오.
@@ -115,7 +115,7 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
         위 대화 내용의 핵심 요약:"""
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that summarizes parts of a meeting transcript."},
                     {"role": "user", "content": prompt}
@@ -124,7 +124,7 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
             )
             return response.choices[0].message.content
         except Exception as e:
-            logging.error(f"GPT-4 개별 요약 API 호출 중 오류: {e}")
+            logging.error(f"GPT-4o 개별 요약 API 호출 중 오류: {e}")
             return ""
 
     if len(text) < 12000:
@@ -148,7 +148,7 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
     최종 통합 요약문:"""
     try:
         final_response = client.chat.completions.create(
-            model="gpt-4-turbo",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that synthesizes multiple summaries into one final, coherent summary."},
                 {"role": "user", "content": final_summary_prompt}
@@ -157,11 +157,11 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
         )
         return final_response.choices[0].message.content.strip()
     except Exception as e:
-        logging.error(f"GPT-4 최종 요약 중 오류 발생: {e}")
+        logging.error(f"GPT-4o 최종 요약 중 오류 발생: {e}")
         return "최종 요약 생성에 실패했습니다."
 
 def _summarize_with_gemini(text, topic, keywords):
-    """Gemini Pro를 사용하여 텍스트를 요약합니다."""
+    """Gemini 2.5 Pro를 사용하여 텍스트를 요약합니다."""
     template = '''
     당신은 회의 내용을 분석하고 핵심만 요약하는 전문 AI 어시스턴트입니다.
     회의 주제: "{topic}"
@@ -186,11 +186,11 @@ def _summarize_with_gemini(text, topic, keywords):
 def summarize_text(llm_choice, text, topic, keywords):
     """선택된 LLM을 사용하여 텍스트를 요약합니다."""
     logging.info(f"LLM({llm_choice})으로 텍스트 요약을 시작합니다...")
-    if llm_choice == "gpt-4":
+    if llm_choice == "gpt-4o":
         client = get_openai_client()
         if not client: return "요약 생성 실패"
         return _summarize_with_gpt_mapreduce(client, text, topic, keywords)
-    elif llm_choice == "gemini-pro":
+    elif llm_choice == "gemini-2.5-pro":
         return _summarize_with_gemini(text, topic, keywords)
     else:
         logging.warning(f"지원하지 않는 LLM 모델({llm_choice})입니다. 요약을 건너뜁니다.")
