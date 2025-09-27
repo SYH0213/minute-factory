@@ -150,7 +150,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
 
     with gr.Tabs() as tabs:
         # --- Tab 1: File Management ---
-        with gr.TabItem("1. 파일 업로드 및 관리"):
+        with gr.TabItem("음성 파일 관리"):
             gr.Markdown("음성/영상 파일을 업로드하거나 서버의 파일을 관리합니다. (mp4, m4a 등은 wav로 자동 변환)")
             with gr.Row():
                 audio_list_df = gr.Dataframe(
@@ -164,7 +164,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
                     upload_status = gr.Markdown("")
             
         # --- Tab 2: Voice Recording ---
-        with gr.TabItem("2. 음성 녹음"):
+        with gr.TabItem("음성 녹음"):
             gr.Markdown("마이크를 사용하여 새 음성을 녹음하고 서버에 저장합니다.")
             record_status = gr.Markdown()
             mic_audio = gr.Audio(sources=["microphone"], type="filepath", label="음성 녹음")
@@ -172,7 +172,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
             save_button = gr.Button("녹음 저장하기")
 
         # --- Tab 3: Zoom Meeting Guide ---
-        with gr.TabItem("3. Zoom 사용법 안내"):
+        with gr.TabItem("Zoom 회의"):
             gr.Markdown("## Zoom 회의 참여 및 녹화 안내")
             gr.Markdown(
                 "**회의 참여:** 아래에 Zoom 회의 링크를 입력하면 참여할 수 있는 링크가 생성됩니다.\n"
@@ -190,7 +190,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
             )
 
         # --- Tab 4: Processing & Summary ---
-        with gr.TabItem("4. 처리 & 요약"):
+        with gr.TabItem("처리 & 요약"):
             gr.Markdown("오디오 파일을 선택하고 처리 및 요약을 실행합니다.")
             with gr.Row():
                 audio_dropdown = gr.Dropdown(label="처리할 오디오 파일", choices=get_audio_files_for_dropdown(), allow_custom_value=True)
