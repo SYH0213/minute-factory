@@ -112,13 +112,14 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
 
         위 대화 내용의 핵심 요약:"""
         try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": GPT_CHUNK_SUMMARY_SYSTEM_PROMPT},
-                            {"role": "user", "content": GPT_CHUNK_SUMMARY_USER_PROMPT.format(topic=topic, keywords=', '.join(keywords), chunk=chunk)}
-                        ],
-                        temperature=0.5,            )
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": GPT_CHUNK_SUMMARY_SYSTEM_PROMPT},
+                    {"role": "user", "content": GPT_CHUNK_SUMMARY_USER_PROMPT.format(topic=topic, keywords=', '.join(keywords), chunk=chunk)}
+                ],
+                temperature=0.5,
+            )
             return response.choices[0].message.content
         except Exception as e:
             logging.error(f"GPT-4o 개별 요약 API 호출 중 오류: {e}")
