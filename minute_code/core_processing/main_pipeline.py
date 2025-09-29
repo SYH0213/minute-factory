@@ -66,6 +66,8 @@ def run_pipeline(audio_path: str, llm_choice: str, topic: str, keywords: list):
     os.makedirs(temp_dir, exist_ok=True) # 임시 폴더 생성
 
     for i, (turn, _, speaker) in enumerate(diarization.itertracks(yield_label=True)):
+        if turn.end - turn.start < 1.0:
+            continue
         start_ms = turn.start * 1000
         end_ms = turn.end * 1000
         segment_audio = audio[start_ms:end_ms]
