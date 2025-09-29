@@ -10,9 +10,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
 from utils.prompts import (
-    GPT_CORRECTION_SYSTEM_PROMPT,
-    GPT_CORRECTION_USER_PROMPT,
-    GEMINI_CORRECTION_PROMPT_TEMPLATE,
+    GEMINI_CORRECTION_PROMPT_V2,      # 새로 추가한 1차 교정 프롬프트
+    SPEAKER_REFINEMENT_PROMPT,        # 새로 추가한 2차 교정 프롬프트
+    # ... 기타 요약 프롬프트들 (이 부분은 그대로 유지)
     GPT_CHUNK_SUMMARY_SYSTEM_PROMPT,
     GPT_CHUNK_SUMMARY_USER_PROMPT,
     GPT_FINAL_SUMMARY_SYSTEM_PROMPT,
