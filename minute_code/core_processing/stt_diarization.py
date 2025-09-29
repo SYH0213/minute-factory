@@ -3,7 +3,7 @@ import os
 import logging
 import torch
 from pyannote.audio import Pipeline
-from .api_helpers import get_pyannote_token
+from utils.api_keys import get_pyannote_token
 
 def diarize_audio(audio_path):
     """
