@@ -34,6 +34,7 @@ minute_code/
 │   ├── stt_diarization.py  # STT 및 화자 분리
 │   └── llm_tasks.py        # LLM 기반 교정 및 요약
 ├── chatbot/                # 챗봇 관련 모듈
+│   ├── chatbot_prompts.py  # 챗봇 프롬프트 정의
 │   └── crag_logic.py       # CRAG 챗봇 로직
 └── utils/                  # 공통 유틸리티 모듈
     ├── api_keys.py         # API 키 로드
