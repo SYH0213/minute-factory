@@ -34,6 +34,7 @@ minute_code/
 │   ├── core_processing_docs.md # 핵심 처리 모듈 설명 문서
 │   ├── main_pipeline.py    # 오디오 처리 전체 파이프라인
 │   ├── stt_diarization.py  # STT 및 화자 분리
+│   ├── stt_test_script.py  # STT 테스트 스크립트
 │   └── llm_tasks.py        # LLM 기반 교정 및 요약
 ├── chatbot/                # 챗봇 관련 모듈
 │   ├── chatbot_docs.md     # 챗봇 모듈 설명 문서
