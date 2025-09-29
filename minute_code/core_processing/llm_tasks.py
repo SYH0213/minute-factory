@@ -9,6 +9,17 @@ from langchain.chains import LLMChain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 
+from utils.prompts import (
+    GPT_CORRECTION_SYSTEM_PROMPT,
+    GPT_CORRECTION_USER_PROMPT,
+    GEMINI_CORRECTION_PROMPT_TEMPLATE,
+    GPT_CHUNK_SUMMARY_SYSTEM_PROMPT,
+    GPT_CHUNK_SUMMARY_USER_PROMPT,
+    GPT_FINAL_SUMMARY_SYSTEM_PROMPT,
+    GPT_FINAL_SUMMARY_USER_PROMPT,
+    GEMINI_SUMMARY_PROMPT_TEMPLATE
+)
+
 # .env 파일에서 API 키 로드
 load_dotenv()
 
@@ -53,8 +64,8 @@ def _correct_with_gpt(client, text, topic, keywords):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that corrects and refines meeting transcripts."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": GPT_CORRECTION_SYSTEM_PROMPT},
+                {"role": "user", "content": GPT_CORRECTION_USER_PROMPT.format(topic=topic, keywords=', '.join(keywords), text=text)}
             ],
             temperature=0.5,
         )
@@ -65,20 +76,7 @@ def _correct_with_gpt(client, text, topic, keywords):
 
 def _correct_with_gemini(text, topic, keywords):
     """Gemini 2.5 Pro를 사용하여 텍스트를 교정합니다."""
-    template = '''
-    당신은 회의록을 교정하고 다듬는 전문적인 AI 어시스턴트입니다.
-    회의 주제: "{topic}"
-    주요 키워드: {keywords}
-    
-    다음 원본 텍스트의 문맥을 유지하면서, 맞춤법, 띄어쓰기, 문법 오류를 수정해주세요.
-    특히, 주요 키워드가 포함된 문장은 더 자연스럽고 전문적인 표현으로 다듬어주세요.
-    결과는 교정된 텍스트만 남겨주세요.
-
-    원본 텍스트:
-    {text}
-
-    교정된 텍스트:
-    '''
+    template = GEMINI_CORRECTION_PROMPT_TEMPLATE
     chain = get_gemini_chain(template, ["text", "topic", "keywords"])
     if not chain: return text
     try:
@@ -114,14 +112,13 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
 
         위 대화 내용의 핵심 요약:"""
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that summarizes parts of a meeting transcript."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.5,
-            )
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": GPT_CHUNK_SUMMARY_SYSTEM_PROMPT},
+                            {"role": "user", "content": GPT_CHUNK_SUMMARY_USER_PROMPT.format(topic=topic, keywords=', '.join(keywords), chunk=chunk)}
+                        ],
+                        temperature=0.5,            )
             return response.choices[0].message.content
         except Exception as e:
             logging.error(f"GPT-4o 개별 요약 API 호출 중 오류: {e}")
@@ -150,8 +147,8 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
         final_response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that synthesizes multiple summaries into one final, coherent summary."},
-                {"role": "user", "content": final_summary_prompt}
+                {"role": "system", "content": GPT_FINAL_SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": GPT_FINAL_SUMMARY_USER_PROMPT.format(topic=topic, combined_summary_text=combined_summary_text)}
             ],
             temperature=0.7,
         )
@@ -162,19 +159,7 @@ def _summarize_with_gpt_mapreduce(client, text, topic, keywords):
 
 def _summarize_with_gemini(text, topic, keywords):
     """Gemini 2.5 Pro를 사용하여 텍스트를 요약합니다."""
-    template = '''
-    당신은 회의 내용을 분석하고 핵심만 요약하는 전문 AI 어시스턴트입니다.
-    회의 주제: "{topic}"
-    주요 키워드: {keywords}
-
-    다음은 회의 전체 대화 내용입니다.
-    이 회의의 핵심 내용을 구조화하여 명확하고 간결하게 요약해주세요.
-
-    전체 대화 내용:
-    {text}
-
-    회의 요약:
-    '''
+    template = GEMINI_SUMMARY_PROMPT_TEMPLATE
     chain = get_gemini_chain(template, ["text", "topic", "keywords"])
     if not chain: return "요약 생성 실패"
     try:
