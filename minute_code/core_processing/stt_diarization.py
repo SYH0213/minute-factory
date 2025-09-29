@@ -42,7 +42,8 @@ def transcribe_segment(client, audio_segment, segment_path, prompt, model):
             transcript = client.audio.transcriptions.create(
                 model=model,
                 file=audio_file,
-                prompt=prompt
+                prompt=prompt,
+                language="ko"
             )
         return transcript.text
     except Exception as e:
