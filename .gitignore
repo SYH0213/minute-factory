@@ -5,3 +5,7 @@ data
 sesacproject
 chroma_db
 old
+__pycache__
+*.pyc
+*.pyo
+*.pyd
