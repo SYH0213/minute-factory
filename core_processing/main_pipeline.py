@@ -7,12 +7,12 @@ from pydub import AudioSegment
 import re
 
 # 현재 패키지의 모듈들 임포트
-from . import config
-from .llm_handler import correct_text, summarize_text, get_openai_client
-from .audio_processing import diarize_audio, transcribe_segment
-from .file_io import save_results
-from .api_helpers import check_api_keys
-from .chatbot_crag import update_vector_store # 챗봇 모듈 임포트
+from utils import config
+from core_processing.llm_tasks import correct_text, summarize_text, get_openai_client
+from core_processing.stt_diarization import diarize_audio, transcribe_segment
+from utils.file_manager import save_results
+from utils.api_keys import check_api_keys
+from chatbot.crag_logic import update_vector_store # 챗봇 모듈 임포트
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
