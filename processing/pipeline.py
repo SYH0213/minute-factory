@@ -4,6 +4,7 @@ import time
 import logging
 import concurrent.futures
 from pydub import AudioSegment
+import re
 
 # 현재 패키지의 모듈들 임포트
 from . import config
@@ -11,6 +12,7 @@ from .llm_handler import correct_text, summarize_text, get_openai_client
 from .audio_processing import diarize_audio, transcribe_segment
 from .file_io import save_results
 from .api_helpers import check_api_keys
+from .chatbot_crag import update_vector_store # 챗봇 모듈 임포트
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -130,5 +132,19 @@ def run_pipeline(audio_path: str, llm_choice: str, topic: str, keywords: list):
         summary=summary
     )
     
+    # --- 6. 벡터 저장소 업데이트 --- #
+    if results_path:
+        base_filename = os.path.splitext(os.path.basename(audio_path))[0]
+        corrected_txt_path = os.path.join(results_path, f"corrected_{base_filename}.txt")
+        
+        # ChromaDB collection 이름으로 사용하기 위해 파일명을 안전한 형식으로 변환
+        collection_name = re.sub(r'[^a-zA-Z0-9_-]', '_', base_filename)
+        
+        try:
+            update_vector_store(corrected_txt_path, collection_name)
+            logging.info(f"벡터 저장소 업데이트 완료: {collection_name}")
+        except Exception as e:
+            logging.error(f"벡터 저장소 업데이트 중 오류 발생: {e}")
+
     logging.info(f"--- 파이프라인 종료 --- 결과가 '{results_path}'에 저장되었습니다.")
     return results_path, "모든 처리가 완료되었습니다."

@@ -3,6 +3,7 @@ import gradio as gr
 import os
 import logging
 from datetime import datetime
+import re
 
 # 통합된 처리 파이프라인 및 설정 임포트
 from processing.pipeline import run_pipeline
@@ -22,6 +23,8 @@ from processing.audio_input import (
     upload_file,
     save_recording
 )
+# 챗봇 CRAG 모듈 임포트
+from processing.chatbot_crag import run_query
 
 # --- 기본 설정 및 디렉터리 생성 ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -45,26 +48,50 @@ def create_zoom_link(url):
         return gr.Markdown("")
     return gr.Markdown("<span style='color: red;'>유효한 Zoom 회의 링크를 입력해주세요.</span>")
 
+def get_processed_meetings():
+    """처리된 회의록 목록을 스캔하여 드롭다운용으로 반환합니다."""
+    processed_meetings = []
+    if not os.path.exists(RESULTS_DIR):
+        return processed_meetings
+
+    for folder_name in os.listdir(RESULTS_DIR):
+        folder_path = os.path.join(RESULTS_DIR, folder_name)
+        if os.path.isdir(folder_path):
+            base_filename = '_'.join(folder_name.split('_')[:-1])
+            corrected_file = f"corrected_{base_filename}.txt"
+            if os.path.exists(os.path.join(folder_path, corrected_file)):
+                collection_name = re.sub(r'[^a-zA-Z0-9_-]', '_', base_filename)
+                processed_meetings.append((folder_name, collection_name))
+    
+    return sorted(processed_meetings, key=lambda x: x[0], reverse=True)
+
+# --- Gradio 콜백 래퍼 함수 ---
+
+def upload_wrapper(file, progress=gr.Progress(track_tqdm=True)):
+    """upload_file에 DATA_DIR을 전달하고 Gradio 프로그레스 바를 활성화하는 래퍼 함수"""
+    return upload_file(file, DATA_DIR, progress)
+
+def save_recording_wrapper(temp_file, fname):
+    """save_recording에 DATA_DIR을 전달하기 위한 래퍼 함수"""
+    return save_recording(temp_file, fname, DATA_DIR)
+
 # --- Gradio 콜백 함수 ---
 
 def run_processing_and_update_ui(audio_filename, llm_choice, topic, keywords_str, progress=gr.Progress(track_tqdm=True)):
     """처리 파이프라인을 실행하고 UI를 업데이트합니다."""
     if not audio_filename:
-        return "처리할 오디오 파일을 먼저 선택해주세요.", "", ""
+        return "처리할 오디오 파일을 먼저 선택해주세요.", "", "", gr.Dropdown(choices=get_processed_meetings())
 
     progress(0, desc="준비 중...")
     audio_path = os.path.join(DATA_DIR, audio_filename)
     keywords = [k.strip() for k in keywords_str.split(',') if k.strip()]
 
-    # 파이프라인 실행
-    progress(0.1, desc="파이프라인 실행 시작...")
     results_path, message = run_pipeline(audio_path, llm_choice, topic, keywords)
     progress(0.9, desc="결과 파일 로딩 중...")
 
     if not results_path:
-        return f"**처리 실패:** {message}", "", ""
+        return f"**처리 실패:** {message}", "", "", gr.Dropdown(choices=get_processed_meetings())
 
-    # 결과 파일 읽기
     summary = "요약 파일을 찾을 수 없습니다."
     corrected_text = "교정된 텍스트 파일을 찾을 수 없습니다."
     try:
@@ -81,14 +108,27 @@ def run_processing_and_update_ui(audio_filename, llm_choice, topic, keywords_str
         message += f"\n결과 파일 로딩 중 오류 발생: {e}"
 
     progress(1, desc="완료")
-    return f"**{message}** 결과는 '{results_path}' 폴더에 저장되었습니다.", summary, corrected_text
+    return f"**{message}** 결과는 '{results_path}' 폴더에 저장되었습니다.", summary, corrected_text, gr.Dropdown(choices=[name for name, _ in get_processed_meetings()])
+
+def handle_chat_message(user_question, history, collection_name):
+    """챗봇 메시지를 처리하고 답변을 생성합니다. (messages 포맷)"""
+    if not collection_name:
+        history.append({"role": "user", "content": user_question})
+        history.append({"role": "assistant", "content": "먼저 좌측 상단에서 대화할 회의록을 선택해주세요."})
+        return history, ""
+        
+    history.append({"role": "user", "content": user_question})
+    yield history, ""
+
+    response = run_query(user_question, collection_name)
+    history.append({"role": "assistant", "content": response})
+    yield history, ""
 
 # --- Gradio UI 빌드 ---
 with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
     gr.Markdown("<h1><center>Minute Factory: AI 회의록 정리</center></h1>")
 
     with gr.Tabs() as tabs:
-        # --- Tab 1: File Management ---
         with gr.TabItem("음성 파일 관리"):
             gr.Markdown("음성/영상 파일을 업로드하거나 서버의 파일을 관리합니다. (mp4, m4a 등은 wav로 자동 변환)")
             with gr.Row():
@@ -102,7 +142,6 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
                     file_uploader = gr.File(label="음성/영상 파일 업로드 (WAV 자동 변환)")
                     upload_status = gr.Markdown("")
             
-        # --- Tab 2: Voice Recording ---
         with gr.TabItem("음성 녹음"):
             gr.Markdown("마이크를 사용하여 새 음성을 녹음하고 서버에 저장합니다.")
             record_status = gr.Markdown()
@@ -110,7 +149,6 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
             save_filename_box = gr.Textbox(label="저장할 파일명 (확장자 제외)", placeholder="예: 주간회의_240927")
             save_button = gr.Button("녹음 저장하기")
 
-        # --- Tab 3: Zoom Meeting Guide ---
         with gr.TabItem("Zoom 회의"):
             gr.Markdown("## Zoom 회의 참여 및 녹화 안내")
             gr.Markdown(
@@ -128,7 +166,6 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
                 "4. 업로드된 파일은 자동으로 음성(.wav) 파일로 변환되어 목록에 추가됩니다."
             )
 
-        # --- Tab 4: Processing & Summary ---
         with gr.TabItem("처리 & 요약"):
             gr.Markdown("오디오 파일을 선택하고 처리 및 요약을 실행합니다.")
             with gr.Row():
@@ -149,38 +186,79 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
                 summary_output = gr.Markdown(label="회의 요약")
                 corrected_output = gr.Textbox(label="교정된 대화록", lines=15, interactive=False)
 
+        with gr.TabItem("회의록 검색 Q&A") as chatbot_tab:
+            with gr.Column():
+                with gr.Row():
+                    chatbot_meeting_selector = gr.Dropdown(
+                        label="대화할 회의록 선택", 
+                        choices=[name for name, _ in get_processed_meetings()],
+                        value=None
+                    )
+                    chatbot_refresh_button = gr.Button("회의록 목록 새로고침")
+                
+                chatbot_history = gr.Chatbot(label="대화 내용", height=500, type="messages")
+                chatbot_question = gr.Textbox(label="질문 입력", placeholder="회의록 내용을 기반으로 질문을 입력하세요...")
+                chatbot_submit_button = gr.Button("전송", variant="primary")
+
+            available_meetings_state = gr.State(dict(get_processed_meetings()))
+            selected_collection_state = gr.State()
+
     # --- 이벤트 핸들러 연결 ---
     
-    # 1. 파일 업로드
     file_uploader.upload(
-        fn=lambda file, progress: upload_file(file, DATA_DIR, progress),
+        fn=upload_wrapper,
         inputs=[file_uploader],
         outputs=[upload_status, audio_list_df, audio_dropdown]
     )
 
-    # 2. 녹음 저장
     save_button.click(
-        fn=lambda temp_file, fname: save_recording(temp_file, fname, DATA_DIR),
+        fn=save_recording_wrapper,
         inputs=[mic_audio, save_filename_box],
         outputs=[record_status, audio_list_df, audio_dropdown]
     )
 
-    # 3. Zoom 링크 생성
     zoom_url_input.change(
         fn=create_zoom_link,
         inputs=[zoom_url_input],
         outputs=[zoom_link_output]
     )
 
-    # 4. 처리 시작
     start_button.click(
         fn=run_processing_and_update_ui,
         inputs=[audio_dropdown, llm_dropdown, topic_input, keywords_input],
-        outputs=[process_status, summary_output, corrected_output]
+        outputs=[process_status, summary_output, corrected_output, chatbot_meeting_selector]
     )
 
-    # 새로고침 버튼
     refresh_button.click(fn=lambda: refresh_audio_dropdown(DATA_DIR), outputs=[audio_dropdown])
+
+    def update_collection_name(selection, state):
+        return state.get(selection)
+
+    chatbot_meeting_selector.change(
+        fn=update_collection_name,
+        inputs=[chatbot_meeting_selector, available_meetings_state],
+        outputs=[selected_collection_state]
+    )
+
+    chatbot_submit_button.click(
+        fn=handle_chat_message,
+        inputs=[chatbot_question, chatbot_history, selected_collection_state],
+        outputs=[chatbot_history, chatbot_question]
+    )
+    chatbot_question.submit(
+        fn=handle_chat_message,
+        inputs=[chatbot_question, chatbot_history, selected_collection_state],
+        outputs=[chatbot_history, chatbot_question]
+    )
+
+    def refresh_chatbot_dropdown():
+        new_meetings = get_processed_meetings()
+        return gr.Dropdown(choices=[name for name, _ in new_meetings]), dict(new_meetings)
+
+    chatbot_refresh_button.click(
+        fn=refresh_chatbot_dropdown,
+        outputs=[chatbot_meeting_selector, available_meetings_state]
+    )
 
 if __name__ == "__main__":
     demo.launch()
