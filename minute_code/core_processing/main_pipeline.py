@@ -13,6 +13,7 @@ from core_processing.stt_diarization import diarize_audio, transcribe_segment
 from utils.file_manager import save_results
 from utils.api_keys import check_api_keys
 from chatbot.crag_logic import update_vector_store # 챗봇 모듈 임포트
+from utils.prompts import STT_PROMPT_TEMPLATE
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -52,7 +53,7 @@ def run_pipeline(audio_path: str, llm_choice: str, topic: str, keywords: list):
         logging.error(f"오디오 파일 로딩 실패: {e}")
         return None, f"오디오 파일({os.path.basename(audio_path)})을 열 수 없습니다."
 
-    stt_prompt = f"이 대화는 '{topic}'에 관한 것입니다. 주요 용어는 다음과 같습니다: {', '.join(keywords)}."
+    stt_prompt = STT_PROMPT_TEMPLATE.format(topic=topic, keywords=', '.join(keywords))
     client = get_openai_client()
     if not client:
         return None, "OpenAI API 클라이언트 초기화에 실패했습니다. .env 파일을 확인하세요."

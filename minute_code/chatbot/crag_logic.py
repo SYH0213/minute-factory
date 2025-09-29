@@ -18,6 +18,13 @@ from langchain_tavily import TavilySearch
 from langgraph.graph import StateGraph, END
 from typing_extensions import TypedDict
 
+from .chatbot_prompts import (
+    CHATBOT_GRADER_SYSTEM_PROMPT,
+    CHATBOT_GRADE_PROMPT_TEMPLATE,
+    CHATBOT_REWRITER_SYSTEM_PROMPT,
+    CHATBOT_REWRITE_PROMPT_TEMPLATE
+)
+
 # --- 1. 기본 설정 ---
 load_dotenv()
 
@@ -85,25 +92,16 @@ class GradeDocuments(BaseModel):
     binary_score: str = Field(description="문서가 질문과 관련 있으면 'yes', 없으면 'no'")
 
 structured_llm_grader = llm.with_structured_output(GradeDocuments, method="function_calling")
-system_grader = """You are a grader assessing relevance of a retrieved document to a user question.
-If the document contains keyword(s) or semantic meaning related to the question, grade it as relevant.
-Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""
+system_grader = CHATBOT_GRADER_SYSTEM_PROMPT
 grade_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system_grader),
-        ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
-    ]
+    [ ("system", system_grader), ("human", CHATBOT_GRADE_PROMPT_TEMPLATE) ]
 )
 retrieval_grader = grade_prompt | structured_llm_grader
 
 # 다. 질문 재작성 모델
-system_rewriter = """You a question re-writer that converts an input question to a better version that is optimized
-for web search. Look at the input and try to reason about the underlying semantic intent / meaning."""
+system_rewriter = CHATBOT_REWRITER_SYSTEM_PROMPT
 re_write_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system_rewriter),
-        ("human", "Here is the initial question: \n\n {question} \n Formulate an improved question."),
-    ]
+    [ ("system", system_rewriter), ("human", CHATBOT_REWRITE_PROMPT_TEMPLATE) ]
 )
 question_rewriter = re_write_prompt | llm | StrOutputParser()
 
