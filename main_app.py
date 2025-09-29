@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import gradio as gr
 import os
-import shutil
-from datetime import datetime
 import logging
+from datetime import datetime
 
 # 통합된 처리 파이프라인 및 설정 임포트
 from processing.pipeline import run_pipeline
@@ -14,6 +13,14 @@ from processing.config import (
     AVAILABLE_LLMS,
     DEFAULT_MEETING_TOPIC,
     DEFAULT_KEYWORDS
+)
+# 오디오 입력 UI 모듈 임포트
+from processing.audio_input import (
+    get_audio_files_for_df,
+    get_audio_files_for_dropdown,
+    refresh_audio_dropdown,
+    upload_file,
+    save_recording
 )
 
 # --- 기본 설정 및 디렉터리 생성 ---
@@ -30,35 +37,6 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 # --- UI 헬퍼 함수 ---
 
-def get_audio_files_for_dropdown():
-    """'data' 폴더에 있는 오디오 파일 목록을 드롭다운용으로 반환합니다."""
-    try:
-        return sorted([f for f in os.listdir(DATA_DIR) if f.lower().endswith(('.wav', '.mp3', '.m4a'))])
-    except FileNotFoundError:
-        return []
-
-def get_audio_files_for_df():
-    """'data' 폴더의 파일 목록을 데이터프레임용으로 상세 정보와 함께 반환합니다."""
-    files_with_details = []
-    try:
-        for f in sorted(os.listdir(DATA_DIR)):
-            path = os.path.join(DATA_DIR, f)
-            if os.path.isfile(path) and f.lower().endswith(('.wav', '.mp3', '.m4a')):
-                size_kb = f"{os.path.getsize(path) / 1024:.2f} KB"
-                mod_time = datetime.fromtimestamp(os.path.getmtime(path)).strftime('%Y-%m-%d %H:%M')
-                files_with_details.append([f, size_kb, mod_time])
-    except Exception as e:
-        logging.error(f"파일 목록(DF) 로딩 중 오류: {e}")
-    return files_with_details
-
-def refresh_audio_dropdown():
-    """오디오 파일 드롭다운을 최신 상태로 업데이트합니다."""
-    return gr.Dropdown(choices=get_audio_files_for_dropdown())
-
-def refresh_audio_df():
-    """오디오 파일 데이터프레임을 최신 상태로 업데이트합니다."""
-    return gr.Dataframe(value=get_audio_files_for_df())
-
 def create_zoom_link(url):
     """Creates a clickable markdown link if the URL is a valid Zoom link."""
     if url and "zoom.us" in url:
@@ -68,45 +46,6 @@ def create_zoom_link(url):
     return gr.Markdown("<span style='color: red;'>유효한 Zoom 회의 링크를 입력해주세요.</span>")
 
 # --- Gradio 콜백 함수 ---
-
-def upload_file(file_obj, progress=gr.Progress(track_tqdm=True)):
-    """파일을 업로드하고 WAV로 변환합니다."""
-    if file_obj is None:
-        return gr.Markdown("파일이 선택되지 않았습니다."), refresh_audio_df(), refresh_audio_dropdown()
-
-    try:
-        from pydub import AudioSegment
-    except ImportError:
-        return gr.Markdown("오류: pydub 라이브러리가 필요합니다. (pip install pydub)"), refresh_audio_df(), refresh_audio_dropdown()
-
-    original_path = file_obj.name
-    filename = os.path.basename(original_path)
-    filename_base, ext = os.path.splitext(filename)
-    wav_path = os.path.join(DATA_DIR, f"{filename_base}.wav")
-
-    try:
-        progress(0, desc="파일 변환 중...")
-        audio = AudioSegment.from_file(original_path)
-        audio.export(wav_path, format="wav")
-        status = f"'{filename}'이(가) '{os.path.basename(wav_path)}'(으)로 변환되어 저장되었습니다."
-    except Exception as e:
-        status = f"파일 변환 중 오류 발생: {e}"
-        logging.error(status)
-
-    return gr.Markdown(status), gr.Dataframe(value=get_audio_files_for_df()), gr.Dropdown(choices=get_audio_files_for_dropdown(), value=os.path.basename(wav_path))
-
-def save_recording(temp_filepath, filename):
-    """녹음 파일을 저장합니다."""
-    if temp_filepath is None:
-        return gr.Markdown("녹음된 파일이 없습니다."), refresh_audio_df(), refresh_audio_dropdown()
-    
-    filename = filename or f"record_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    filename = filename if filename.lower().endswith('.wav') else f"{filename}.wav"
-    destination_path = os.path.join(DATA_DIR, filename)
-    shutil.move(temp_filepath, destination_path)
-    
-    status = f"'{filename}'(으)로 녹음을 저장했습니다."
-    return gr.Markdown(status), gr.Dataframe(value=get_audio_files_for_df()), gr.Dropdown(choices=get_audio_files_for_dropdown(), value=filename)
 
 def run_processing_and_update_ui(audio_filename, llm_choice, topic, keywords_str, progress=gr.Progress(track_tqdm=True)):
     """처리 파이프라인을 실행하고 UI를 업데이트합니다."""
@@ -155,7 +94,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
             with gr.Row():
                 audio_list_df = gr.Dataframe(
                     headers=["파일명", "크기", "수정일"],
-                    value=get_audio_files_for_df(),
+                    value=get_audio_files_for_df(DATA_DIR),
                     interactive=False
                 )
             with gr.Row():
@@ -179,7 +118,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
                 "**회의 녹화:** 이 앱은 Zoom 회의를 직접 녹화할 수 없습니다. 대신, Zoom의 자체 녹화 기능을 사용하세요."
             )
             with gr.Row():
-                zoom_url_input = gr.Textbox(label="Zoom 회의 링크", placeholder="https://zoom.us/j/ப்புகளை")
+                zoom_url_input = gr.Textbox(label="Zoom 회의 링크", placeholder="https://zoom.us/j/1234567890")
             zoom_link_output = gr.Markdown("")
             gr.Markdown(
                 "### 녹화 파일을 업로드하는 방법\n"
@@ -193,7 +132,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
         with gr.TabItem("처리 & 요약"):
             gr.Markdown("오디오 파일을 선택하고 처리 및 요약을 실행합니다.")
             with gr.Row():
-                audio_dropdown = gr.Dropdown(label="처리할 오디오 파일", choices=get_audio_files_for_dropdown(), allow_custom_value=True)
+                audio_dropdown = gr.Dropdown(label="처리할 오디오 파일", choices=get_audio_files_for_dropdown(DATA_DIR), allow_custom_value=True)
                 refresh_button = gr.Button("파일 목록 새로고침")
             
             gr.Markdown("회의 정보를 입력하세요.")
@@ -214,14 +153,14 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
     
     # 1. 파일 업로드
     file_uploader.upload(
-        fn=upload_file,
+        fn=lambda file, progress: upload_file(file, DATA_DIR, progress),
         inputs=[file_uploader],
         outputs=[upload_status, audio_list_df, audio_dropdown]
     )
 
     # 2. 녹음 저장
     save_button.click(
-        fn=save_recording,
+        fn=lambda temp_file, fname: save_recording(temp_file, fname, DATA_DIR),
         inputs=[mic_audio, save_filename_box],
         outputs=[record_status, audio_list_df, audio_dropdown]
     )
@@ -241,7 +180,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
     )
 
     # 새로고침 버튼
-    refresh_button.click(fn=refresh_audio_dropdown, outputs=[audio_dropdown])
+    refresh_button.click(fn=lambda: refresh_audio_dropdown(DATA_DIR), outputs=[audio_dropdown])
 
 if __name__ == "__main__":
     demo.launch()
