@@ -5,6 +5,8 @@ import logging
 import concurrent.futures
 from pydub import AudioSegment
 import re
+import uuid
+from slugify import slugify
 
 # 현재 패키지의 모듈들 임포트
 from utils import config
@@ -64,6 +66,8 @@ def run_pipeline(audio_path: str, llm_choice: str, topic: str, keywords: list):
     os.makedirs(temp_dir, exist_ok=True) # 임시 폴더 생성
 
     for i, (turn, _, speaker) in enumerate(diarization.itertracks(yield_label=True)):
+        if turn.end - turn.start < 1.0:
+            continue
         start_ms = turn.start * 1000
         end_ms = turn.end * 1000
         segment_audio = audio[start_ms:end_ms]
@@ -138,8 +142,19 @@ def run_pipeline(audio_path: str, llm_choice: str, topic: str, keywords: list):
         base_filename = os.path.splitext(os.path.basename(audio_path))[0]
         corrected_txt_path = os.path.join(results_path, f"corrected_{base_filename}.txt")
         
-        # ChromaDB collection 이름으로 사용하기 위해 파일명을 안전한 형식으로 변환
-        collection_name = re.sub(r'[^a-zA-Z0-9_-]', '_', base_filename)
+        # 1. Transliterate base_filename to an ASCII slug
+        slugified_name = slugify(base_filename, separator='_', lowercase=True, replacements=[['.', '_']])
+        # 2. Apply final sanitization (ChromaDB specific)
+        collection_name = re.sub(r'[^a-zA-Z0-9._-]', '_', slugified_name)
+
+        # 3. Ensure collection_name meets ChromaDB's rules (min 3 chars, starts/ends with alphanumeric)
+        # Remove leading/trailing underscores that might violate start/end rule
+        collection_name = collection_name.strip('_')
+        
+        # If it became empty after stripping, or is too short, use a fallback
+        if not collection_name or len(collection_name) < 3:
+            # Fallback to a unique identifier if the slugified name is too short
+            collection_name = "meeting_" + str(uuid.uuid4())[:8].replace('-', '_') # Ensure it's always valid and long enough
         
         try:
             update_vector_store(corrected_txt_path, collection_name)

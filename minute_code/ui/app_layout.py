@@ -3,6 +3,8 @@ import gradio as gr
 import os
 import logging
 import re
+import uuid
+from slugify import slugify
 
 # 프로젝트 모듈 임포트
 from core_processing.main_pipeline import run_pipeline
@@ -49,7 +51,25 @@ def get_processed_meetings():
             base_filename = '_'.join(folder_name.split('_')[:-1])
             corrected_file = f"corrected_{base_filename}.txt"
             if os.path.exists(os.path.join(folder_path, corrected_file)):
-                collection_name = re.sub(r'[^a-zA-Z0-9_-]', '_', base_filename)
+                # 1. Transliterate base_filename to an ASCII slug
+                slugified_name = slugify(base_filename, separator='_', lowercase=True, replacements=[['.', '_']])
+                # 2. Apply final sanitization (ChromaDB specific) - remove any remaining non-allowed chars
+                collection_name = re.sub(r'[^a-zA-Z0-9._-]', '_', slugified_name)
+
+                # 3. Ensure collection_name meets ChromaDB's rules (min 3 chars, starts/ends with alphanumeric)
+                # Remove leading/trailing underscores that might violate start/end rule
+                collection_name = collection_name.strip('_')
+                
+                # If it became empty after stripping, or is too short, use a fallback
+                if not collection_name or len(collection_name) < 3:
+                    # Fallback to a sanitized version of the full folder_name if base_filename is too short/empty
+                    temp_name = slugify(folder_name, separator='_', lowercase=True, replacements=[['.', '_']])
+                    temp_name = re.sub(r'[^a-zA-Z0-9._-]', '_', temp_name).strip('_')
+                    if len(temp_name) >= 3:
+                        collection_name = temp_name
+                    else:
+                        # Last resort: generate a unique, valid name
+                        collection_name = "meeting_" + str(uuid.uuid4())[:8].replace('-', '_') # Ensure it's always valid and long enough
                 processed_meetings.append((folder_name, collection_name))
     
     return sorted(processed_meetings, key=lambda x: x[0], reverse=True)

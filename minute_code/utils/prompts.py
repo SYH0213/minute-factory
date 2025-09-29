@@ -96,4 +96,4 @@ GEMINI_SUMMARY_PROMPT_TEMPLATE = '''
 '''
 
 # --- STT 프롬프트 템플릿 ---
-STT_PROMPT_TEMPLATE = "이 대화는 '{topic}'에 관한 것입니다. 주요 용어는 다음과 같습니다: {keywords}."
+STT_PROMPT_TEMPLATE = ""
