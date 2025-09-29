@@ -22,7 +22,7 @@ from typing_extensions import TypedDict
 load_dotenv()
 
 # 프로젝트 루트를 기준으로 chroma_db 경로 설정
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CHROMA_PERSIST_DIR = os.path.join(ROOT_DIR, "chroma_db")
 os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
 

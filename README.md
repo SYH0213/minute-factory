@@ -23,27 +23,28 @@
 ## 프로젝트 구조
 
 ```
-minute_factory/
-├── main_app.py           # Gradio 앱 실행 스크립트
-├── ui/                     # UI 관련 모듈
-│   ├── app_layout.py       # 전체 UI 레이아웃 및 콜백
-│   └── input_handlers.py   # 오디오 입력(업로드, 녹음) 처리
-├── core_processing/      # 핵심 기능 처리 모듈
-│   ├── main_pipeline.py    # 오디오 처리 전체 파이프라인
-│   ├── stt_diarization.py  # STT 및 화자 분리
-│   └── llm_tasks.py        # LLM 기반 교정 및 요약
-├── chatbot/                # 챗봇 관련 모듈
-│   └── crag_logic.py       # CRAG 챗봇 로직
-├── utils/                  # 공통 유틸리티 모듈
-│   ├── api_keys.py         # API 키 로드
-│   ├── config.py           # 전역 설정
-│   └── file_manager.py     # 파일 저장/관리
+minute_code/
+├── minute_code/         # 모든 소스 코드를 담는 최상위 패키지
+│   ├── __init__.py
+│   ├── main_app.py           # Gradio 앱 실행 스크립트
+│   ├── ui/                     # UI 관련 모듈
+│   │   ├── app_layout.py       # 전체 UI 레이아웃 및 콜백
+│   │   └── input_handlers.py   # 오디오 입력(업로드, 녹음) 처리
+│   ├── core_processing/      # 핵심 기능 처리 모듈
+│   │   ├── main_pipeline.py    # 오디오 처리 전체 파이프라인
+│   │   ├── stt_diarization.py  # STT 및 화자 분리
+│   │   └── llm_tasks.py        # LLM 기반 교정 및 요약
+│   ├── chatbot/                # 챗봇 관련 모듈
+│   │   └── crag_logic.py       # CRAG 챗봇 로직
+│   └── utils/                  # 공통 유틸리티 모듈
+│       ├── api_keys.py         # API 키 로드
+│       ├── config.py           # 전역 설정
+│       └── file_manager.py     # 파일 저장/관리
 ├── chroma_db/            # (자동생성) ChromaDB 벡터 저장소
 ├── data/                 # (자동생성) 입력 오디오 파일 저장
 ├── results/              # (자동생성) 결과물 저장
 ├── temp/                 # (자동생성) 임시 파일 저장
 ├── .env                  # (직접생성) API 키 저장 파일
-├── main_app.py           # UI를 포함한 메인 실행 파일
 └── requirements.txt      # 필요 라이브러리 목록
 ```
 
@@ -75,10 +76,8 @@ minute_factory/
 
 5.  **애플리케이션 실행**:
     ```bash
-    python main_app.py
-    ```
-
-6.  **웹 브라우저에서 접속**:
+    python minute_code/main_app.py
+    ```6.  **웹 브라우저에서 접속**:
     *   터미널에 표시되는 주소(보통 `http://127.0.0.1:7860`)를 웹 브라우저에 열어 애플리케이션을 사용합니다.
 
 ## 사용 방법

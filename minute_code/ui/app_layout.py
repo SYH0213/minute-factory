@@ -23,7 +23,7 @@ from ui.input_handlers import (
 from chatbot.crag_logic import run_query
 
 # --- 기본 설정 ---
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(ROOT_DIR, AUDIO_INPUT_DIR_NAME)
 RESULTS_DIR = os.path.join(ROOT_DIR, RESULTS_DIR_NAME)
 

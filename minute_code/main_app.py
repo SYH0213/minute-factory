@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def setup_directories():
     """프로젝트에 필요한 모든 디렉터리를 생성합니다."""
-    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     # config.py에서 정의된 디렉토리 이름들을 사용하여 경로 구성
     dir_names = [AUDIO_INPUT_DIR_NAME, RESULTS_DIR_NAME, TEMP_DIR_NAME]
