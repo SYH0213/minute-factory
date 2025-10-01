@@ -4,7 +4,7 @@ import os
 import logging
 
 # 프로젝트 모듈 임포트
-from minute_code.ui.app_layout_ import create_ui
+from ui.app_layout import create_ui
 from utils.config import (
     AUDIO_INPUT_DIR_NAME,
     RESULTS_DIR_NAME,
