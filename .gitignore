@@ -5,12 +5,8 @@ data
 sesacproject
 chroma_db
 old
-<<<<<<< HEAD
 # Python-specific files
 __pycache__/
-=======
-__pycache__
 *.pyc
 *.pyo
 *.pyd
->>>>>>> develop
