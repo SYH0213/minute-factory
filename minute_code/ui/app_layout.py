@@ -89,7 +89,7 @@ def save_recording_wrapper(temp_file, fname):
 def run_processing_and_update_ui(audio_filename, llm_choice, topic, keywords_str, progress=gr.Progress(track_tqdm=True)):
     """처리 파이프라인을 실행하고 UI를 업데이트합니다."""
     if not audio_filename:
-        return "처리할 오디오 파일을 먼저 선택해주세요.", "", "", gr.Dropdown(choices=get_processed_meetings())
+        return "처리할 오디오 파일을 먼저 선택해주세요.", "", "", gr.Dropdown(choices=[name for name, _ in get_processed_meetings()]), {}
 
     progress(0, desc="준비 중...")
     audio_path = os.path.join(DATA_DIR, audio_filename)
@@ -99,7 +99,7 @@ def run_processing_and_update_ui(audio_filename, llm_choice, topic, keywords_str
     progress(0.9, desc="결과 파일 로딩 중...")
 
     if not results_path:
-        return f"**처리 실패:** {message}", "", "", gr.Dropdown(choices=get_processed_meetings())
+        return f"**처리 실패:** {message}", "", "", gr.Dropdown(choices=[name for name, _ in get_processed_meetings()]), {}
 
     summary = "요약 파일을 찾을 수 없습니다."
     corrected_text = "교정된 텍스트 파일을 찾을 수 없습니다."
@@ -117,7 +117,8 @@ def run_processing_and_update_ui(audio_filename, llm_choice, topic, keywords_str
         message += f"\n결과 파일 로딩 중 오류 발생: {e}"
 
     progress(1, desc="완료")
-    return f"**{message}** 결과는 '{results_path}' 폴더에 저장되었습니다.", summary, corrected_text, gr.Dropdown(choices=[name for name, _ in get_processed_meetings()])
+    new_meetings = get_processed_meetings()
+    return f"**{message}** 결과는 '{results_path}' 폴더에 저장되었습니다.", summary, corrected_text, gr.Dropdown(choices=[name for name, _ in new_meetings]), dict(new_meetings)
 
 def handle_chat_message(user_question, history, collection_name):
     """챗봇 메시지를 처리하고 답변을 생성합니다. (messages 포맷)"""
@@ -133,12 +134,83 @@ def handle_chat_message(user_question, history, collection_name):
     history.append({"role": "assistant", "content": response})
     yield history, ""
 
+# --- Q&A 탭 콜백 함수 ---
+
+# 화자별 아이콘 리스트 (이모지)
+SPEAKER_ICONS = ["😀", "😎", "😊", "🧑", "👩", "🤔", "🤓", "🤖"]
+
+def load_meeting_data(selection, state):
+    """드롭다운에서 회의록 선택 시 요약과 대화록을 로드합니다."""
+    if not selection:
+        return gr.update(value=None), gr.update(value=None), None
+
+    # 1. 파일 경로 찾기
+    base_filename = '_'.join(selection.split('_')[:-1])
+    results_folder_path = os.path.join(RESULTS_DIR, selection)
+    summary_path = os.path.join(results_folder_path, f"summary_{base_filename}.md")
+    corrected_path = os.path.join(results_folder_path, f"corrected_{base_filename}.txt")
+
+    # 2. 요약 파일 읽기
+    summary_content = "요약 파일을 찾을 수 없습니다."
+    try:
+        with open(summary_path, 'r', encoding='utf-8') as f:
+            summary_content = f.read()
+    except FileNotFoundError:
+        logging.warning(f"요약 파일 없음: {summary_path}")
+    except Exception as e:
+        logging.error(f"요약 파일 읽기 오류: {e}")
+
+    # 3. 대화록 파일 읽고 파싱하기 (chat.png UI 처럼)
+    transcript_chat_history = []
+    speaker_icon_map = {}
+    icon_index = 0
+    try:
+        with open(corrected_path, 'r', encoding='utf-8') as f:
+            full_text = f.read() # 파일 전체를 하나의 문자열로 읽기
+        
+        lines = full_text.split('\n') # 문자열을 줄바꿈 기준으로 나누어 리스트 생성
+
+        for line in lines:
+            if not line.strip(): # 빈 줄은 건너뛰기
+                continue
+
+            match = re.search(r'\[.*?s - .*?s\]\s*(.*?):\s*(.*)', line)
+            if match:
+                speaker, text = match.groups()
+                speaker = speaker.strip()
+                
+                # 새로운 화자일 경우, 아이콘 리스트에서 아이콘 할당
+                if speaker not in speaker_icon_map:
+                    speaker_icon_map[speaker] = SPEAKER_ICONS[icon_index % len(SPEAKER_ICONS)]
+                    icon_index += 1
+                
+                icon = speaker_icon_map[speaker]
+                
+                # 아이콘, 화자 이름, 대화 내용을 포함하는 왼쪽 정렬 말풍선 생성
+                chat_message = f"{icon} **{speaker}**\n{text.strip()}"
+                transcript_chat_history.append((chat_message, None))
+            else:
+                transcript_chat_history.append((line.strip(), None))
+    except FileNotFoundError:
+        logging.warning(f"대화록 파일 없음: {corrected_path}")
+        transcript_chat_history = [("대화록 파일을 찾을 수 없습니다.", None)]
+    except Exception as e:
+        logging.error(f"대화록 파일 읽기 오류: {e}")
+        transcript_chat_history = [("대화록 파일 로딩 중 오류 발생: " + str(e), None)]
+
+    # 4. Collection 이름 가져오기
+    collection_name = state.get(selection)
+
+    return summary_content, transcript_chat_history, collection_name
+
+
+
 # --- Gradio UI 빌드 ---
 def create_ui():
     with gr.Blocks(theme=gr.themes.Soft(), title="AI 회의록 정리") as demo:
         gr.Markdown("<h1><center>Minute Factory: AI 회의록 정리</center></h1>")
 
-        with gr.Tabs() as tabs:
+        with gr.Tabs():
             with gr.TabItem("음성 파일 관리"):
                 gr.Markdown("음성/영상 파일을 업로드하거나 서버의 파일을 관리합니다. (mp4, m4a 등은 wav로 자동 변환)")
                 with gr.Row():
@@ -196,7 +268,7 @@ def create_ui():
                     summary_output = gr.Markdown(label="회의 요약")
                     corrected_output = gr.Textbox(label="교정된 대화록", lines=15, interactive=False)
 
-            with gr.TabItem("회의록 검색 Q&A") as chatbot_tab:
+            with gr.TabItem("회의록 검색 Q&A"):
                 with gr.Column():
                     with gr.Row():
                         chatbot_meeting_selector = gr.Dropdown(
@@ -206,9 +278,15 @@ def create_ui():
                         )
                         chatbot_refresh_button = gr.Button("회의록 목록 새로고침")
                     
-                    chatbot_history = gr.Chatbot(label="대화 내용", height=500, type="messages")
-                    chatbot_question = gr.Textbox(label="질문 입력", placeholder="회의록 내용을 기반으로 질문을 입력하세요...")
-                    chatbot_submit_button = gr.Button("전송", variant="primary")
+                    with gr.Tabs():
+                        with gr.TabItem("📜 대화록"):
+                            transcript_output = gr.Chatbot(label="전체 대화 내용", height=500)
+                        with gr.TabItem("📝 요약"):
+                            summary_output_qa = gr.Markdown(label="회의 요약 내용")
+                        with gr.TabItem("❓ 질문하기"):
+                            chatbot_history = gr.Chatbot(label="대화 내용", height=500, type="messages")
+                            chatbot_question = gr.Textbox(label="질문 입력", placeholder="회의록 내용을 기반으로 질문을 입력하세요...")
+                            chatbot_submit_button = gr.Button("전송", variant="primary")
 
                 available_meetings_state = gr.State(dict(get_processed_meetings()))
                 selected_collection_state = gr.State()
@@ -233,23 +311,33 @@ def create_ui():
             outputs=[zoom_link_output]
         )
 
+        refresh_button.click(fn=lambda: refresh_audio_dropdown(DATA_DIR), outputs=[audio_dropdown])
+
+        # Q&A 탭 이벤트 핸들러
+        def refresh_chatbot_dropdown():
+            new_meetings = get_processed_meetings()
+            return gr.Dropdown(choices=[name for name, _ in new_meetings]), dict(new_meetings)
+
+        chatbot_refresh_button.click(
+            fn=refresh_chatbot_dropdown,
+            outputs=[chatbot_meeting_selector, available_meetings_state]
+        )
+        
+        # 처리 & 요약 탭에서 처리가 완료되면 Q&A 탭의 드롭다운과 상태를 함께 업데이트
         start_button.click(
             fn=run_processing_and_update_ui,
             inputs=[audio_dropdown, llm_dropdown, topic_input, keywords_input],
-            outputs=[process_status, summary_output, corrected_output, chatbot_meeting_selector]
+            outputs=[process_status, summary_output, corrected_output, chatbot_meeting_selector, available_meetings_state]
         )
 
-        refresh_button.click(fn=lambda: refresh_audio_dropdown(DATA_DIR), outputs=[audio_dropdown])
-
-        def update_collection_name(selection, state):
-            return state.get(selection)
-
+        # 회의록 선택 시 데이터 로드
         chatbot_meeting_selector.change(
-            fn=update_collection_name,
+            fn=load_meeting_data,
             inputs=[chatbot_meeting_selector, available_meetings_state],
-            outputs=[selected_collection_state]
+            outputs=[summary_output_qa, transcript_output, selected_collection_state]
         )
 
+        # 챗봇 질문/답변
         chatbot_submit_button.click(
             fn=handle_chat_message,
             inputs=[chatbot_question, chatbot_history, selected_collection_state],
@@ -259,15 +347,6 @@ def create_ui():
             fn=handle_chat_message,
             inputs=[chatbot_question, chatbot_history, selected_collection_state],
             outputs=[chatbot_history, chatbot_question]
-        )
-
-        def refresh_chatbot_dropdown():
-            new_meetings = get_processed_meetings()
-            return gr.Dropdown(choices=[name for name, _ in new_meetings]), dict(new_meetings)
-
-        chatbot_refresh_button.click(
-            fn=refresh_chatbot_dropdown,
-            outputs=[chatbot_meeting_selector, available_meetings_state]
         )
         
         return demo
