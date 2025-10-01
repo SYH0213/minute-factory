@@ -107,7 +107,15 @@ re_write_prompt = ChatPromptTemplate.from_messages(
 question_rewriter = re_write_prompt | llm | StrOutputParser()
 
 # 라. 답변 생성 체인
-prompt_generator = hub.pull("rlm/rag-prompt")
+RAG_PROMPT_KOREAN = """당신은 질문에 답변하는 AI 어시스턴트입니다. 다음 검색된 컨텍스트를 사용하여 질문에 답하세요. 만약 답을 모른다면, 모른다고 말해주세요.
+
+질문: {question}
+
+컨텍스트:
+{context}
+
+답변:"""
+prompt_generator = ChatPromptTemplate.from_template(RAG_PROMPT_KOREAN)
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 rag_chain = prompt_generator | llm | StrOutputParser()
