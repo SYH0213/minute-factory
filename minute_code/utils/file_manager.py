@@ -62,10 +62,7 @@ def save_results(base_results_dir, original_filename, meeting_topic, keywords, o
             f.write(f"## 주요 키워드\n- {', '.join(keywords)}\n\n")
             f.write("## 핵심 요약\n")
             f.write(summary + "\n\n")
-            f.write("## 전체 대화 (교정본)\n")
-            for segment in corrected_transcript:
-                f.write(f"- **{segment['speaker']}**: {segment['text']}\n")
-        logging.info(f"회의 요약 및 전체 대화 내용을 '{summary_md_path}'에 저장했습니다.")
+        logging.info(f"회의 요약 내용을 '{summary_md_path}'에 저장했습니다.")
     except IOError as e:
         logging.error(f"파일 저장 중 오류 발생 ({summary_md_path}): {e}")
 
